@@ -1,0 +1,25 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+google-api-python-client = "*"
+google-auth-httplib2 = "*"
+google-auth-oauthlib = "*"
+kaleido = "*"
+pandas = "*"
+plotly = "*"
+python-dotenv = "*"
+
+[dev-packages]
+black = "*"
+flake8-annotations = "*"
+flake8-bugbear = "*"
+ipykernel = "*"
+mypy = "*"
+nbformat = "*"
+pre-commit = "*"
+
+[requires]
+python_version = "3.11"
