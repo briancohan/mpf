@@ -3,12 +3,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from . import theme  # # noqa: F401
-from .data import get_value_counts
+from . import data
 
 
 def events_by_state(df: pd.DataFrame) -> go.Figure:
     col = "State"
-    _df = get_value_counts(df, col)
+    _df = data.get_value_counts(df, col)
 
     fig = px.choropleth(
         _df,
@@ -37,7 +37,7 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
 
 def events_by_category(df: pd.DataFrame) -> go.Figure:
     col = "LPB"
-    _df = get_value_counts(df, col)
+    _df = data.get_value_counts(df, col)
     _df = _df[~(_df[col] == "")].reset_index()
 
     fig = px.bar(
@@ -55,13 +55,13 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
     )
     standoff = 174
     fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
-    fig.update_traces(textposition='outside')
+    fig.update_traces(textposition="outside")
     return fig
 
 
 def events_by_date(df: pd.DataFrame) -> go.Figure:
     col = "Date"
-    _df = get_value_counts(df, col)
+    _df = data.get_value_counts(df, col)
 
     fig = px.strip(
         _df,
