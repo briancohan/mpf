@@ -55,6 +55,7 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
     )
     standoff = 174
     fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
+    fig.update_traces(textposition='outside')
     return fig
 
 
