@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+          {
+                "label": "Render Graphs",
+                "type": "shell",
+                "command": "pipenv run python create_figures.py",
+                "presentation": {
+                      "reveal": "never",
+                      "panel": "shared"
+                },
+                "options": {
+                      "cwd": "${workspaceFolder}"
+                },
+                "problemMatcher": []
+          },
+    ]
+}

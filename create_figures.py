@@ -10,5 +10,24 @@ df = get_data(get_credentials())
 for name, func in getmembers(graph, isfunction):
     if name.startswith("_"):
         continue
-    file = Config.EXPORT_DIR / f"{name}.png"
-    func(df).write_image(str(file))
+    print(name, "...", end="")
+
+    try:
+        fig = func(df)
+    except:
+        print("❌❌")
+        continue
+    
+    try:
+        file = Config.PROJECT_DIR / "figures" / f"{name}.png"
+        fig.write_image(str(file))
+        print("✅")
+    except:
+        print("❌")
+
+
+    try:
+        file = Config.EXPORT_DIR / f"{name}.png"
+        fig.write_image(str(file))
+    except OSError:
+        pass
