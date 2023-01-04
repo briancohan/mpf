@@ -1,4 +1,5 @@
 from itertools import chain
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,6 +14,12 @@ def _fix_facet_labels(fig: go.Figure) -> None:
     """Remove column name and '=' from labels."""
     for annotation in fig.layout.annotations:
         annotation.text = annotation.text.split("=")[1]
+
+
+def _fix_left_margin(fig: go.Figure, data: pd.Series) -> None:
+    """Fix the left margin so Y-axis title is legible."""
+    standoff = 8 * max(len(str(item)) for item in data)
+    fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
 
 
 ########################################
@@ -72,9 +79,7 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
         height=30 * len(_df),  # Grow for inclusion of additional categories
     )
 
-    # Adjust left margin so title does not interfere with labels
-    standoff = 8 * max(len(str(item)) for item in df[("", "LPB")])
-    fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
+    _fix_left_margin(fig, df[("", Config.LPB)])
     fig.update_traces(textposition="outside")
 
     return fig
@@ -268,17 +273,16 @@ def shoe_size_distribution_by_category(df: pd.DataFrame) -> go.Figure:
 
 
 def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
-    _df = (
-        data.column_comparison(df, [Config.TYPE, Config.SIZE])
-        .dropna(subset=[(Config.REPORTED, Config.SIZE), (Config.FOUND, Config.SIZE)])
+    _df = data.column_comparison(df, [Config.TYPE, Config.SIZE]).dropna(
+        subset=[(Config.REPORTED, Config.SIZE), (Config.FOUND, Config.SIZE)]
     )
-    _df.columns = ['report_type', 'report_size', 'found_type', 'found_size']
+    _df.columns = ["report_type", "report_size", "found_type", "found_size"]
+
     # Convert to ranges and determine min/max size
-    _df['report_size'] = [
-        tuple(float(i) for i in value.split('-'))
-        for value in _df['report_size']
+    _df["report_size"] = [
+        tuple(float(i) for i in value.split("-")) for value in _df["report_size"]
     ]
-    sizes = list(chain.from_iterable(_df['report_size'])) + list(_df['found_size'])
+    sizes = list(chain.from_iterable(_df["report_size"])) + list(_df["found_size"])
     sizes = [float(size) for size in sizes]
     rng = [min(sizes) - 1, max(sizes) + 1]
 
@@ -339,7 +343,6 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
         y -= legend_spacing
 
     fig.add_shape(type="rect", x0=5, x1=9, y0=y, y1=13.5 + legend_spacing)
-
 
     # Add Match Lines and Error Ranges
     fig.add_shape(
@@ -406,4 +409,63 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
         dtick=1,
     )
 
+    return fig
+
+
+########################################
+# Footwear Brand
+########################################
+def brand_distribution(df: pd.DataFrame) -> go.Figure:
+    _df = data.column_comparison(df, [Config.TYPE, Config.BRAND])
+
+    _rdf = _df[Config.REPORTED].dropna().value_counts().reset_index()
+    _fdf = _df[Config.FOUND].dropna().value_counts().reset_index()
+    _rdf[Config.REPORT] = Config.REPORTED
+    _fdf[Config.REPORT] = Config.FOUND
+    _df = pd.concat([_rdf, _fdf])
+    _df.rename(columns={0: Config.COUNT}, inplace=True)
+
+    brand_order = (
+        _df.groupby(Config.BRAND)
+        .sum(numeric_only=True)
+        .sort_values(Config.COUNT, ascending=False)
+        .index
+    )
+
+    fig = px.bar(
+        _df,
+        x=Config.COUNT,
+        y=Config.BRAND,
+        color=Config.TYPE,
+        category_orders={Config.BRAND: brand_order},
+        text_auto=True,
+        height=31 * len(brand_order),
+        facet_col=Config.REPORT,
+    )
+
+    _fix_left_margin(fig, _df[Config.BRAND])
+
+    return fig
+
+
+def brand_accuracy(df: pd.DataFrame) -> go.Figure:
+    # TODO Is this figure worth keeping?
+    _df = data.column_comparison(df, [Config.TYPE, Config.BRAND]).dropna(
+        subset=[(Config.REPORTED, Config.BRAND), (Config.FOUND, Config.BRAND)]
+    )
+    for col in [Config.TYPE, Config.BRAND]:
+        _df[("MATCH", col)] = _df[(Config.REPORTED, col)] == _df[(Config.FOUND, col)]
+
+    _df = _df[_df["MATCH"].sum(axis=1) < 2]
+    _df.columns = [" - ".join(col) for col in _df.columns]
+    _df
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(values=_df.columns),
+                cells=dict(values=_df.T.values),
+            )
+        ]
+    )
     return fig

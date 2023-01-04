@@ -14,17 +14,16 @@ for name, func in getmembers(graph, isfunction):
 
     try:
         fig = func(df)
-    except:
+    except Exception:
         print("❌❌")
         continue
-    
+
     try:
         file = Config.PROJECT_DIR / "figures" / f"{name}.png"
         fig.write_image(str(file))
         print("✅")
-    except:
+    except Exception:
         print("❌")
-
 
     try:
         file = Config.EXPORT_DIR / f"{name}.png"

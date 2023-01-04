@@ -5,7 +5,6 @@ import pandas as pd
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from .auth import get_credentials
 from .config import Config
 
 
