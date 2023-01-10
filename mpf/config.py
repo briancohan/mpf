@@ -13,6 +13,7 @@ class Config:
     CRED_DIR = PROJECT_DIR / "cred"
     CRED_FILE = next(CRED_DIR.glob("*.json"))
     TOKEN_FILE = CRED_DIR / "token.json"
+    BACKUP_CSV = PROJECT_DIR / "data.csv"
 
     # If modifying these scopes, delete the file token.json.
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
@@ -37,6 +38,7 @@ class Config:
     REPORTED = "REPORTED"
     FOUND = "FOUND"
     COUNT = "Count"
+    MATCH = "Match"
     NA = "N/A"
 
     ID = "Identifier"
@@ -57,7 +59,7 @@ class Config:
         COLOR,
         SIZE,
         BRAND,
-        WIDTH,
+        # WIDTH,
     ]
 
     REPORT = "Report Type"

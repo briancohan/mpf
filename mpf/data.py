@@ -44,15 +44,28 @@ def get_data(creds: dict) -> pd.DataFrame:
         )
         values = result.get("values", [])
 
-    except HttpError as err:
-        print(err)
+        df = pd.DataFrame(values[2:], columns=create_column_index(values[0], values[1]))
+        df = df.replace("", np.nan).fillna(np.nan)
 
-    df = pd.DataFrame(values[2:], columns=create_column_index(values[0], values[1]))
-    return df.replace("", np.nan).fillna(np.nan)
+        df.fillna("").to_csv(Config.BACKUP_CSV)
+
+    except HttpError:
+        print("LOADING FROM BACKUP")
+        df = (
+            pd.read_csv(Config.BACKUP_CSV, header=[0, 1])
+            .replace("", np.nan)
+            .fillna(np.nan)
+        )
+
+    return df
 
 
-def get_value_counts(df: pd.DataFrame, col: str) -> pd.DataFrame:
-    _df = df.iloc[:, df.columns.get_level_values(1) == col].value_counts().reset_index()
+def get_value_counts(df: pd.DataFrame, col: str, dropna: bool = True) -> pd.DataFrame:
+    _df = (
+        df.iloc[:, df.columns.get_level_values(1) == col]
+        .value_counts(dropna=dropna)
+        .reset_index()
+    )
     _df.columns = [col, Config.COUNT]
     return _df
 
@@ -64,6 +77,17 @@ def column_comparison(df: pd.DataFrame, columns: str | list[str]) -> pd.DataFram
     _df = df.iloc[:, df.columns.get_level_values(1).isin(columns)]
     if len(columns) == 1:
         _df.columns = _df.columns.get_level_values(0)
+    return _df
+
+
+def column_comparison_no_na(df: pd.DataFrame, col: str) -> pd.DataFrame:
+    _df = column_comparison(df, [Config.TYPE, col]).dropna(
+        subset=[(Config.REPORTED, col), (Config.FOUND, col)]
+    )
+
+    for col in [Config.TYPE, col]:
+        _df[("MATCH", col)] = _df[(Config.REPORTED, col)] == _df[(Config.FOUND, col)]
+
     return _df
 
 

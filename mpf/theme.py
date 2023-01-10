@@ -7,7 +7,8 @@ nats = dict(
     layout=dict(
         width=800,
         colorway=[Config.BRAND_PRIMARY, "#f26157", "#3a5683", "#8e3b46"],
-        plot_bgcolor=Config.BRAND_SECONDARY,
+        # plot_bgcolor=Config.BRAND_SECONDARY,
+        plot_bgcolor="#cccccc",
         colorscale=dict(
             sequential=[
                 (0, Config.BRAND_SECONDARY),

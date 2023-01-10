@@ -3,3 +3,4 @@ cred/
 *.ipynb
 __pycache__
 figures/
+*.csv

@@ -1,5 +1,6 @@
 from itertools import chain
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,7 +14,12 @@ from .config import Config
 def _fix_facet_labels(fig: go.Figure) -> None:
     """Remove column name and '=' from labels."""
     for annotation in fig.layout.annotations:
-        annotation.text = annotation.text.split("=")[1]
+        if "=REPORTED" in annotation.text:
+            annotation.text = "Reported Footwear"
+        elif "=FOUND" in annotation.text:
+            annotation.text = "Found Footwear"
+        else:
+            annotation.text = annotation.text.split("=")[1]
 
 
 def _fix_left_margin(fig: go.Figure, data: pd.Series) -> None:
@@ -61,8 +67,39 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
 def events_by_category(df: pd.DataFrame) -> go.Figure:
     """Show distribution of cases by LPB category."""
     col = Config.LPB
-    _df = data.get_value_counts(df, col)
-    _df = _df[~(_df[col] == "")].reset_index()
+    _df = data.get_value_counts(df, Config.LPB, False).replace(pd.NA, "UNKNOWN")
+
+    # Create Figure
+    fig = px.bar(
+        _df,
+        x=Config.COUNT,
+        y=col,
+        orientation="h",
+        text=Config.COUNT,
+        category_orders={col: _df.sort_values(Config.COUNT)[col]},
+        labels={
+            col: "Lost Person Behavior Category",
+            Config.COUNT: "Number of Cases",
+        },
+        height=30 * len(_df),  # Grow for inclusion of additional categories
+    )
+
+    _fix_left_margin(fig, df[("", Config.LPB)])
+    fig.update_traces(textposition="outside")
+
+    return fig
+
+
+def events_by_category_unshod(df: pd.DataFrame) -> go.Figure:
+    """Show distribution of cases by LPB category."""
+    col = Config.LPB
+    _df = (
+        df[df[(Config.FOUND, Config.TYPE)] == "unshod"][("", col)]
+        .value_counts()
+        .reset_index()
+    )
+
+    _df.columns = [col, Config.COUNT]
 
     # Create Figure
     fig = px.bar(
@@ -100,13 +137,25 @@ def events_by_date(df: pd.DataFrame) -> go.Figure:
 
 
 def data_completeness(df: pd.DataFrame) -> go.Figure:
-    _df = data.column_comparison(df, Config.METRICS).isna().sum().reset_index()
+    _df = data.column_comparison(df, Config.METRICS)
+    for metric in Config.METRICS:
+        counts = sum(
+            [
+                ~_df[(Config.REPORTED, metric)].isna(),
+                ~_df[(Config.FOUND, metric)].isna(),
+            ]
+        )
+        _df[("BOTH", metric)] = counts == 2
+        _df = _df.replace(True, "included").replace(False, np.nan)
+
+    _df = _df.isna().sum().reset_index()
 
     _df.columns = [Config.REPORT, Config.METRIC, Config.COUNT]
     _df[Config.COUNT] = len(df) - _df[Config.COUNT]
 
     _df = _df.pivot(index=Config.REPORT, columns=Config.METRIC, values=Config.COUNT)
     _df = _df[Config.METRICS].sort_index(ascending=False)
+    # return _df
 
     fig = px.imshow(
         _df.values,
@@ -117,13 +166,16 @@ def data_completeness(df: pd.DataFrame) -> go.Figure:
     )
 
     fig.update_xaxes(side="top")
+    fig.update_yaxes(title="")
 
     return fig
 
 
-def data_completeness_by_type(df: pd.DataFrame) -> go.Figure:
-    # TODO: Add numbers to subplots
+def data_completeness_by_type(df: pd.DataFrame, show_minimal: bool = True) -> go.Figure:
     _df = data.column_comparison(df, Config.METRICS)
+
+    if not show_minimal:
+        _df = _df.replace("minimal", "shoes")
 
     _rdf = _df[Config.REPORTED].copy()
     _fdf = _df[Config.FOUND].copy()
@@ -137,21 +189,31 @@ def data_completeness_by_type(df: pd.DataFrame) -> go.Figure:
         .groupby([Config.REPORT, Config.TYPE, "variable"])
         .count()
         .reset_index()
-        .pivot(index=[Config.REPORT, Config.TYPE], columns="variable", values="value")
+        .pivot(index=Config.TYPE, columns=[Config.REPORT, "variable"], values="value")
+    )
+
+    _rdf = _df[Config.REPORTED]
+    r_fig = px.imshow(
+        _rdf.values,
+        x=_rdf.columns,
+        y=_rdf.index,
+        text_auto=True,
+    )
+    _fdf = _df[Config.FOUND]
+    f_fig = px.imshow(
+        _rdf.values,
+        x=_rdf.columns,
+        y=_rdf.index,
+        text_auto=True,
     )
 
     titles = [Config.REPORTED, Config.FOUND]
     fig = sp.make_subplots(rows=1, cols=2, subplot_titles=titles)
 
-    for col, report in enumerate(titles, 1):
-        cur_df = _df.loc[report, :]
-        fig.add_trace(
-            go.Heatmap(
-                x=cur_df.columns, y=cur_df.index, z=cur_df.values, coloraxis="coloraxis"
-            ),
-            row=1,
-            col=col,
-        )
+    for item in r_fig.data:
+        fig.add_trace(item, row=1, col=1)
+    for item in f_fig.data:
+        fig.add_trace(item, row=1, col=2)
 
     fig.update_annotations(y=1.15)
     fig.update_xaxes(side="top")
@@ -159,25 +221,29 @@ def data_completeness_by_type(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def data_completeness_by_type_no_minimal(df: pd.DataFrame) -> go.Figure:
+    return data_completeness_by_type(df=df, show_minimal=False)
+
+
 ########################################
 # Footwear Type
 ########################################
-def footwear_type_summary(df: pd.DataFrame) -> go.Figure:
+def footwear_type_summary(df: pd.DataFrame, show_minimal: bool = True) -> go.Figure:
     rows = Config.REPORTED
     cols = Config.FOUND
 
-    _df = (
-        data.column_comparison(df, "Type")
-        .value_counts()
-        .reset_index()
-        .rename(columns={0: Config.COUNT})
-        .replace("", Config.NA)
-        .pivot_table(
-            index=rows,
-            columns=cols,
-            values=Config.COUNT,
-        )
-        # .fillna(0)
+    _df = data.column_comparison(df, "Type")
+    if not show_minimal:
+        _df = _df.replace("minimal", "shoes")
+
+    _df = _df.value_counts().reset_index().rename(columns={0: Config.COUNT})
+    # TODO Make this less hacky
+    _df.loc[len(_df.index)] = ["mix", "mix", 0]
+
+    _df = _df.pivot_table(
+        index=rows,
+        columns=cols,
+        values=Config.COUNT,
     )
 
     fig = px.imshow(
@@ -188,7 +254,12 @@ def footwear_type_summary(df: pd.DataFrame) -> go.Figure:
         y=list(_df.index),
     )
     fig.update_xaxes(side="top")
+    fig.data[0]["z"][np.where(fig.data[0]["z"] == 0)] = np.nan
     return fig
+
+
+def footwear_type_summary_no_minimal(df: pd.DataFrame) -> go.Figure:
+    return footwear_type_summary(df=df, show_minimal=False)
 
 
 ########################################
@@ -415,7 +486,11 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
 ########################################
 # Footwear Brand
 ########################################
-def brand_distribution(df: pd.DataFrame) -> go.Figure:
+def brand_distribution(
+    df: pd.DataFrame,
+    threshold: int = 1,
+    height: int = 35,
+) -> go.Figure:
     _df = data.column_comparison(df, [Config.TYPE, Config.BRAND])
 
     _rdf = _df[Config.REPORTED].dropna().value_counts().reset_index()
@@ -423,6 +498,11 @@ def brand_distribution(df: pd.DataFrame) -> go.Figure:
     _rdf[Config.REPORT] = Config.REPORTED
     _fdf[Config.REPORT] = Config.FOUND
     _df = pd.concat([_rdf, _fdf])
+    keep = _df.groupby(Config.BRAND).sum(numeric_only=True)
+    keep.columns = [Config.COUNT]
+    keep = keep[keep[Config.COUNT] > threshold].reset_index()[Config.BRAND].values
+    _df = _df[_df[Config.BRAND].isin(keep)]
+
     _df.rename(columns={0: Config.COUNT}, inplace=True)
 
     brand_order = (
@@ -439,22 +519,22 @@ def brand_distribution(df: pd.DataFrame) -> go.Figure:
         color=Config.TYPE,
         category_orders={Config.BRAND: brand_order},
         text_auto=True,
-        height=31 * len(brand_order),
+        height=height * len(brand_order),
         facet_col=Config.REPORT,
     )
 
     _fix_left_margin(fig, _df[Config.BRAND])
+    _fix_facet_labels(fig)
 
     return fig
 
 
+def brand_distribution_gte2(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
+    return brand_distribution(df=df, threshold=threshold, height=50)
+
+
 def brand_accuracy(df: pd.DataFrame) -> go.Figure:
-    # TODO Is this figure worth keeping?
-    _df = data.column_comparison(df, [Config.TYPE, Config.BRAND]).dropna(
-        subset=[(Config.REPORTED, Config.BRAND), (Config.FOUND, Config.BRAND)]
-    )
-    for col in [Config.TYPE, Config.BRAND]:
-        _df[("MATCH", col)] = _df[(Config.REPORTED, col)] == _df[(Config.FOUND, col)]
+    _df = data.column_comparison_no_na(df, Config.BRAND)
 
     _df = _df[_df["MATCH"].sum(axis=1) < 2]
     _df.columns = [" - ".join(col) for col in _df.columns]
@@ -468,4 +548,70 @@ def brand_accuracy(df: pd.DataFrame) -> go.Figure:
             )
         ]
     )
+    return fig
+
+
+########################################
+# Footwear Color
+########################################
+def color_distribution(df: pd.DataFrame) -> go.Figure:
+    _df = data.column_comparison(df, [Config.TYPE, Config.COLOR])
+    for report_type in (Config.REPORTED, Config.FOUND):
+        _df.loc[
+            _df[(report_type, Config.TYPE)] == "minimal", (report_type, Config.TYPE)
+        ] = "shoes"
+        for sep in "/,":
+            _df[(report_type, Config.COLOR)] = [
+                color.split(sep)[0] if sep in str(color) else color
+                for color in _df[(report_type, Config.COLOR)]
+            ]
+
+    _rdf = _df[Config.REPORTED].dropna().value_counts().reset_index()
+    _fdf = _df[Config.FOUND].dropna().value_counts().reset_index()
+    _rdf[Config.REPORT] = Config.REPORTED
+    _fdf[Config.REPORT] = Config.FOUND
+    _df = pd.concat([_rdf, _fdf]).dropna()
+    _df.rename(columns={0: Config.COUNT}, inplace=True)
+    _df = _df[_df[Config.TYPE] != "mix"]
+
+    brand_order = (
+        _df.groupby(Config.COLOR)
+        .sum(numeric_only=True)
+        .sort_values(Config.COUNT, ascending=False)
+        .index
+    )
+
+    fig = px.bar(
+        _df,
+        x=Config.COUNT,
+        y=Config.COLOR,
+        color=Config.TYPE,
+        category_orders={Config.COLOR: brand_order},
+        text_auto=True,
+        height=31 * len(brand_order),
+        facet_col=Config.REPORT,
+    )
+
+    _fix_facet_labels(fig)
+    _fix_left_margin(fig, _df[Config.COLOR])
+
+    return fig
+
+
+def color_accuracy(df: pd.DataFrame) -> go.Figure:
+    _df = data.column_comparison_no_na(df, Config.COLOR)
+
+    _df = _df[_df["MATCH"].sum(axis=1) < 2]
+    _df.columns = [" - ".join(col) for col in _df.columns]
+    _df
+
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(values=_df.columns),
+                cells=dict(values=_df.T.values),
+            )
+        ]
+    )
+    fig.update_layout(height=800)
     return fig
