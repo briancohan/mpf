@@ -7,14 +7,14 @@ nats = dict(
     layout=dict(
         width=800,
         colorway=[Config.BRAND_PRIMARY, "#f26157", "#3a5683", "#8e3b46"],
-        # plot_bgcolor=Config.BRAND_SECONDARY,
-        plot_bgcolor="#cccccc",
+        plot_bgcolor="#ededed",
         colorscale=dict(
             sequential=[
                 (0, Config.BRAND_SECONDARY),
                 (1, Config.BRAND_PRIMARY),
             ]
         ),
+        font_family=Config.FONT,
     ),
     data=dict(
         scatter=[

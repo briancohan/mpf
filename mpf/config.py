@@ -22,6 +22,8 @@ class Config:
     SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
     WORKSHEET_NAME = os.getenv("WORKSHEET_NAME")
 
+    FONT = "Arial"
+
     # Colors
     BRAND_PRIMARY = "#3E552B"
     BRAND_SECONDARY = "#EDDEBF"
@@ -32,6 +34,13 @@ class Config:
         minimal="#C3AC77",
         shoes="#6475B3",
         mix="#BF6E85",
+    )
+    FOOTWEAR_MARKER = dict(
+        boots="circle",
+        shoes="square",
+        unshod="circle-open-dot",
+        minimal="diamond-wide",
+        mix="cross",
     )
 
     # Keywords

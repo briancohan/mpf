@@ -80,13 +80,19 @@ def column_comparison(df: pd.DataFrame, columns: str | list[str]) -> pd.DataFram
     return _df
 
 
-def column_comparison_no_na(df: pd.DataFrame, col: str) -> pd.DataFrame:
+def column_comparison_no_na(
+    df: pd.DataFrame, col: str, keep_type: bool = True
+) -> pd.DataFrame:
     _df = column_comparison(df, [Config.TYPE, col]).dropna(
         subset=[(Config.REPORTED, col), (Config.FOUND, col)]
     )
 
     for col in [Config.TYPE, col]:
         _df[("MATCH", col)] = _df[(Config.REPORTED, col)] == _df[(Config.FOUND, col)]
+
+    if not keep_type:
+        _df = _df.iloc[:, [1, 3, 5]]
+        _df.columns = _df.columns.get_level_values(0)
 
     return _df
 

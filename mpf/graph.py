@@ -22,9 +22,9 @@ def _fix_facet_labels(fig: go.Figure) -> None:
             annotation.text = annotation.text.split("=")[1]
 
 
-def _fix_left_margin(fig: go.Figure, data: pd.Series) -> None:
+def _fix_left_margin(fig: go.Figure, data: pd.Series, standoff: int = 0) -> None:
     """Fix the left margin so Y-axis title is legible."""
-    standoff = 8 * max(len(str(item)) for item in data)
+    standoff = standoff or 8 * max(len(str(item)) for item in data)
     fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
 
 
@@ -67,26 +67,51 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
 def events_by_category(df: pd.DataFrame) -> go.Figure:
     """Show distribution of cases by LPB category."""
     col = Config.LPB
-    _df = data.get_value_counts(df, Config.LPB, False).replace(pd.NA, "UNKNOWN")
+    _df = data.get_value_counts(df, Config.LPB, False).replace(pd.NA, "unknown")
+
+    child_df = _df[_df.LPB.str.startswith("child")].reset_index(drop=True)
+    adult_df = _df[~_df.LPB.str.startswith("child")]
+    total_children = child_df["Count"].sum()
+
+    adult_df.loc[len(adult_df.index)] = ["child", total_children]
+    adult_df = adult_df.sort_values("Count", ascending=False).reset_index(drop=True)
 
     # Create Figure
-    fig = px.bar(
-        _df,
+    adult_fig = px.bar(
+        adult_df,
         x=Config.COUNT,
         y=col,
         orientation="h",
         text=Config.COUNT,
-        category_orders={col: _df.sort_values(Config.COUNT)[col]},
         labels={
             col: "Lost Person Behavior Category",
-            Config.COUNT: "Number of Cases",
         },
-        height=30 * len(_df),  # Grow for inclusion of additional categories
     )
+    child_fig = px.bar(
+        child_df,
+        x=Config.COUNT,
+        y=col,
+        orientation="h",
+        text=Config.COUNT,
+        labels={
+            col: "Lost Person Behavior Category",
+        },
+    )
+    fig = sp.make_subplots(rows=1, cols=2, horizontal_spacing=0.15)
+    for item in adult_fig.data:
+        fig.add_trace(item, row=1, col=1)
+    for item in child_fig.data:
+        fig.add_trace(item, row=1, col=2)
 
     _fix_left_margin(fig, df[("", Config.LPB)])
     fig.update_traces(textposition="outside")
-
+    fig.update_layout(
+        yaxis_categoryorder="total ascending",
+        yaxis2_categoryorder="total ascending",
+        xaxis_range=[0, adult_df.Count.max() * 1.1],
+        xaxis2_range=[0, child_df.Count.max() * 1.1],
+        height=35 * len(adult_df),  # Grow for inclusion of additional categories
+    )
     return fig
 
 
@@ -111,7 +136,7 @@ def events_by_category_unshod(df: pd.DataFrame) -> go.Figure:
         category_orders={col: _df.sort_values(Config.COUNT)[col]},
         labels={
             col: "Lost Person Behavior Category",
-            Config.COUNT: "Number of Cases",
+            # Config.COUNT: "Number of Cases",
         },
         height=30 * len(_df),  # Grow for inclusion of additional categories
     )
@@ -132,6 +157,7 @@ def events_by_date(df: pd.DataFrame) -> go.Figure:
         x=col,
         height=400,
     )
+    fig.layout.xaxis.title = "Year"
 
     return fig
 
@@ -201,13 +227,13 @@ def data_completeness_by_type(df: pd.DataFrame, show_minimal: bool = True) -> go
     )
     _fdf = _df[Config.FOUND]
     f_fig = px.imshow(
-        _rdf.values,
-        x=_rdf.columns,
-        y=_rdf.index,
+        _fdf.values,
+        x=_fdf.columns,
+        y=_fdf.index,
         text_auto=True,
     )
 
-    titles = [Config.REPORTED, Config.FOUND]
+    titles = ["Reported Footwear", "Found Footwear"]
     fig = sp.make_subplots(rows=1, cols=2, subplot_titles=titles)
 
     for item in r_fig.data:
@@ -223,6 +249,110 @@ def data_completeness_by_type(df: pd.DataFrame, show_minimal: bool = True) -> go
 
 def data_completeness_by_type_no_minimal(df: pd.DataFrame) -> go.Figure:
     return data_completeness_by_type(df=df, show_minimal=False)
+
+
+def overall_accuracy(df: pd.DataFrame, size_tolerance: float = 0.5) -> go.Figure:
+    # Type Info
+    type_df = data.column_comparison_no_na(df, Config.TYPE)
+
+    # Size Info
+    size_df = data.column_comparison_no_na(df, Config.SIZE, keep_type=False)
+    size_df[Config.REPORTED] = [
+        tuple(float(i) for i in value.split("-")) for value in size_df[Config.REPORTED]
+    ]
+    size_df[Config.FOUND] = size_df[Config.FOUND].astype("float")
+    size_df["MATCH"] = [
+        row.REPORTED[0] - size_tolerance
+        <= row.FOUND  # noqa: W503
+        <= row.REPORTED[-1] + size_tolerance  # noqa: W503
+        for row in size_df.itertuples()
+    ]
+
+    # Color Info
+    color_df = data.column_comparison_no_na(df, Config.COLOR, keep_type=False)
+
+    color_df["MATCH"] = [
+        row.REPORTED in row.FOUND or row.FOUND in row.REPORTED
+        for row in color_df.itertuples()
+    ]
+
+    # Brand Info
+    brand_df = data.column_comparison_no_na(df, Config.BRAND, keep_type=False)
+
+    type_correct = int(sum(type_df["MATCH"].values))
+    type_incorrect = len(type_df) - type_correct
+    size_correct = sum(size_df["MATCH"].values)
+    size_incorrect = len(size_df) - size_correct
+    color_correct = sum(color_df["MATCH"].values)
+    color_incorrect = len(color_df) - color_correct
+    brand_correct = sum(brand_df["MATCH"].values)
+    brand_incorrect = len(brand_df) - brand_correct
+
+    _df = pd.DataFrame(
+        [
+            (
+                Config.TYPE,
+                type_correct,
+                type_incorrect,
+                round(type_correct * 100 / len(type_df), 1),
+                round(type_incorrect * 100 / len(type_df), 1),
+            ),
+            (
+                Config.SIZE,
+                size_correct,
+                size_incorrect,
+                round(size_correct * 100 / len(size_df), 1),
+                round(size_incorrect * 100 / len(size_df), 1),
+            ),
+            (
+                Config.COLOR,
+                color_correct,
+                color_incorrect,
+                round(color_correct * 100 / len(color_df), 1),
+                round(color_incorrect * 100 / len(color_df), 1),
+            ),
+            (
+                Config.BRAND,
+                brand_correct,
+                brand_incorrect,
+                round(brand_correct * 100 / len(brand_df), 1),
+                round(brand_incorrect * 100 / len(brand_df), 1),
+            ),
+        ],
+        columns=["Metric", "Correct", "Incorrect", "% Correct", "% Incorrect"],
+    )
+    _df = _df.sort_values("Correct")
+
+    opts = dict(
+        x="value",
+        y="Metric",
+        color="variable",
+        orientation="h",
+        text_auto=True,
+        category_orders={
+            "Metric": [Config.TYPE, Config.COLOR, Config.BRAND, Config.SIZE]
+        },
+    )
+    fig_v = px.bar(
+        _df[["Metric", "Correct", "Incorrect"]].melt(id_vars="Metric"), **opts
+    )
+    fig_p = px.bar(
+        _df[["Metric", "% Correct", "% Incorrect"]].melt(id_vars="Metric"), **opts
+    )
+
+    fig = sp.make_subplots(rows=1, cols=2, column_titles=["By Value", "By Percentage"])
+    for item in fig_v.data:
+        fig.add_trace(item, row=1, col=1)
+    for item in fig_p.data:
+        fig.add_trace(item, row=1, col=2)
+
+    for trace in fig.data:
+        if trace.legendgroup.startswith("%"):
+            trace.showlegend = False
+
+    fig.update_layout(barmode="stack")
+
+    return fig
 
 
 ########################################
@@ -249,12 +379,13 @@ def footwear_type_summary(df: pd.DataFrame, show_minimal: bool = True) -> go.Fig
     fig = px.imshow(
         _df.values,
         text_auto=True,
-        labels={"x": cols, "y": rows, "color": Config.COUNT},
+        labels={"x": "Found Footwear", "y": "Reported Footwear", "color": Config.COUNT},
         x=list(_df.columns),
         y=list(_df.index),
     )
     fig.update_xaxes(side="top")
     fig.data[0]["z"][np.where(fig.data[0]["z"] == 0)] = np.nan
+    _fix_left_margin(fig, _df.index, standoff=15)
     return fig
 
 
@@ -265,6 +396,21 @@ def footwear_type_summary_no_minimal(df: pd.DataFrame) -> go.Figure:
 ########################################
 # Footwear Size
 ########################################
+def _fix_size_yaxis_labels(fig: go.Figure) -> None:
+    annotations = [
+        annotation
+        for annotation in fig.layout.annotations
+        if not any(
+            word.lower() in annotation.text.lower()
+            for word in [Config.REPORTED, Config.FOUND]
+        )
+    ]
+    fig.layout.annotations = annotations
+    fig.layout.yaxis.title.text = "Found Footwear - Count"
+    other_axis = len([i for i in fig.layout if i.startswith("yaxis")]) // 2 + 1
+    fig.layout[f"yaxis{other_axis}"].title.text = "Reported Footwear - Count"
+
+
 def shoe_size_distribution_by_type(df: pd.DataFrame) -> go.Figure:
     _df = data.clean_shoe_size_data(df)
 
@@ -300,7 +446,7 @@ def shoe_size_distribution_by_type(df: pd.DataFrame) -> go.Figure:
         for attr in ["legendgroup", "name", "offsetgroup"]:
             record[attr] = legend_names[record[attr]]
     fig.layout.legend.title = "Sizing Legend"
-
+    _fix_size_yaxis_labels(fig)
     return fig
 
 
@@ -339,7 +485,7 @@ def shoe_size_distribution_by_category(df: pd.DataFrame) -> go.Figure:
         annotation.text = annotation.text.capitalize()
 
     fig.layout.legend.title = "Sizing Legend"
-
+    _fix_size_yaxis_labels(fig)
     return fig
 
 
@@ -366,6 +512,7 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
                 y=[row.found_size] * len(row.report_size),
                 showlegend=False,
                 marker_color=Config.FOOTWEAR_COLOR[row.found_type],
+                marker_symbol=Config.FOOTWEAR_MARKER[row.found_type],
             )
         )
 
@@ -393,44 +540,65 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
     legend_spacing = 0.3
     y = 13.5 - legend_spacing
     entries = [
-        ("Reported Value", Config.BRAND_PRIMARY),
-        ("Found: Boot", Config.FOOTWEAR_COLOR["boots"]),
-        ("Found: Shoes", Config.FOOTWEAR_COLOR["shoes"]),
-        ("Found: Minimal", Config.FOOTWEAR_COLOR["minimal"]),
-        ("Found: Mix", Config.FOOTWEAR_COLOR["mix"]),
+        ("Reported Value", Config.BRAND_PRIMARY, "circle"),
+        (
+            "Found: Boot",
+            Config.FOOTWEAR_COLOR["boots"],
+            Config.FOOTWEAR_MARKER["boots"],
+        ),
+        (
+            "Found: Shoes",
+            Config.FOOTWEAR_COLOR["shoes"],
+            Config.FOOTWEAR_MARKER["shoes"],
+        ),
+        (
+            "Found: Minimal",
+            Config.FOOTWEAR_COLOR["minimal"],
+            Config.FOOTWEAR_MARKER["minimal"],
+        ),
+        ("Found: Mix", Config.FOOTWEAR_COLOR["mix"], Config.FOOTWEAR_MARKER["mix"]),
     ]
-    for text, marker_color in entries:
+    for text, marker_color, marker_symbol in entries:
         fig.add_trace(
             go.Scatter(
                 x=[legend_key_center],
                 y=[y],
                 showlegend=False,
                 marker_color=marker_color,
+                marker_symbol=marker_symbol,
             )
         )
         fig.add_annotation(
             text=text, x=legend_text_start, y=y, showarrow=False, xanchor="left"
         )
+        if "Found" not in text:
+            y -= legend_spacing
         y -= legend_spacing
 
     fig.add_shape(type="rect", x0=5, x1=9, y0=y, y1=13.5 + legend_spacing)
 
     # Add Match Lines and Error Ranges
+    erng = rng[0] - 1, rng[1] + 1
     fig.add_shape(
         type="line",
         line=dict(color="black", dash="dot"),
         xref="x",
-        x0=rng[0],
-        x1=rng[1],
+        x0=erng[0],
+        x1=erng[1],
         yref="y",
-        y0=rng[0],
-        y1=rng[1],
+        y0=erng[0],
+        y1=erng[1],
     )
     for offset in [0.5, 1.0]:
         fig.add_trace(
             go.Scatter(
-                x=[rng[0] - offset, rng[1] - offset, rng[1] + offset, rng[0] + offset],
-                y=[rng[0], rng[1], rng[1], rng[0]],
+                x=[
+                    erng[0] - offset,
+                    erng[1] - offset,
+                    erng[1] + offset,
+                    erng[0] + offset,
+                ],
+                y=[erng[0], erng[1], erng[1], erng[0]],
                 fill="toself",
                 line=dict(width=0),
                 marker=None,
@@ -469,12 +637,12 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
         range=rng,
         scaleanchor="x",
         scaleratio=1,
-        title=Config.FOUND + " SHOE SIZE",
+        title=Config.FOUND.title() + " Shoe Size",
         tick0=rng[0],
         dtick=1,
     )
     fig.update_xaxes(
-        title=Config.REPORTED + " SHOE SIZE",
+        title=Config.REPORTED.title() + " Shoe Size",
         range=rng,
         tick0=rng[0],
         dtick=1,
@@ -486,7 +654,7 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
 ########################################
 # Footwear Brand
 ########################################
-def brand_distribution(
+def brand_distribution_gte1(
     df: pd.DataFrame,
     threshold: int = 1,
     height: int = 35,
@@ -530,7 +698,7 @@ def brand_distribution(
 
 
 def brand_distribution_gte2(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
-    return brand_distribution(df=df, threshold=threshold, height=50)
+    return brand_distribution_gte1(df=df, threshold=threshold, height=50)
 
 
 def brand_accuracy(df: pd.DataFrame) -> go.Figure:
@@ -538,7 +706,6 @@ def brand_accuracy(df: pd.DataFrame) -> go.Figure:
 
     _df = _df[_df["MATCH"].sum(axis=1) < 2]
     _df.columns = [" - ".join(col) for col in _df.columns]
-    _df
 
     fig = go.Figure(
         data=[
@@ -574,12 +741,14 @@ def color_distribution(df: pd.DataFrame) -> go.Figure:
     _df.rename(columns={0: Config.COUNT}, inplace=True)
     _df = _df[_df[Config.TYPE] != "mix"]
 
-    brand_order = (
+    brand_order = list(
         _df.groupby(Config.COLOR)
         .sum(numeric_only=True)
         .sort_values(Config.COUNT, ascending=False)
         .index
     )
+    brand_order.remove("various")
+    brand_order.append("various")
 
     fig = px.bar(
         _df,
@@ -588,7 +757,7 @@ def color_distribution(df: pd.DataFrame) -> go.Figure:
         color=Config.TYPE,
         category_orders={Config.COLOR: brand_order},
         text_auto=True,
-        height=31 * len(brand_order),
+        height=40 * len(brand_order),
         facet_col=Config.REPORT,
     )
 
