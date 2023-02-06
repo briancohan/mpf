@@ -27,6 +27,18 @@ nats = dict(
     ),
 )
 
+jsar = dict(
+    layout=dict(
+        font_size=Config.JSAR_FONT_SIZE,
+        title_font_size=Config.JSAR_FONT_SIZE,
+        legend_font_size=Config.JSAR_FONT_SIZE,
+        legend_title_font_size=Config.JSAR_FONT_SIZE,
+        legend_grouptitlefont_size=Config.JSAR_FONT_SIZE,
+        xaxis_title_font_size=Config.JSAR_FONT_SIZE,
+        yaxis_title_font_size=Config.JSAR_FONT_SIZE,
+    )
+)
 
 pio.templates["nats"] = go.layout.Template(nats)
+pio.templates["jsar"] = go.layout.Template(jsar)
 pio.templates.default = "nats"

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 import plotly.subplots as sp
 
 from . import theme  # # noqa: F401
@@ -46,6 +47,10 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
         height=600,
     )
 
+    font_size = 14
+    if "jsar" in pio.templates.default:
+        font_size = Config.JSAR_FONT_SIZE
+
     # Annotate count in each state
     for row in _df.itertuples():
         fig.add_trace(
@@ -55,7 +60,8 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
                 locationmode="USA-states",
                 mode="text",
                 textfont=dict(
-                    color="black" if row.Count < _df.Count.mean() else "white", size=16
+                    color="black" if row.Count < _df.Count.mean() else "white",
+                    size=font_size,
                 ),
                 showlegend=False,
             )
@@ -294,29 +300,29 @@ def overall_accuracy(df: pd.DataFrame, size_tolerance: float = 0.5) -> go.Figure
                 Config.TYPE,
                 type_correct,
                 type_incorrect,
-                round(type_correct * 100 / len(type_df), 1),
-                round(type_incorrect * 100 / len(type_df), 1),
+                round(type_correct * 100 / len(type_df), 0),
+                round(type_incorrect * 100 / len(type_df), 0),
             ),
             (
                 Config.SIZE,
                 size_correct,
                 size_incorrect,
-                round(size_correct * 100 / len(size_df), 1),
-                round(size_incorrect * 100 / len(size_df), 1),
+                round(size_correct * 100 / len(size_df), 0),
+                round(size_incorrect * 100 / len(size_df), 0),
             ),
             (
                 Config.COLOR,
                 color_correct,
                 color_incorrect,
-                round(color_correct * 100 / len(color_df), 1),
-                round(color_incorrect * 100 / len(color_df), 1),
+                round(color_correct * 100 / len(color_df), 0),
+                round(color_incorrect * 100 / len(color_df), 0),
             ),
             (
                 Config.BRAND,
                 brand_correct,
                 brand_incorrect,
-                round(brand_correct * 100 / len(brand_df), 1),
-                round(brand_incorrect * 100 / len(brand_df), 1),
+                round(brand_correct * 100 / len(brand_df), 0),
+                round(brand_incorrect * 100 / len(brand_df), 0),
             ),
         ],
         columns=["Metric", "Correct", "Incorrect", "% Correct", "% Incorrect"],

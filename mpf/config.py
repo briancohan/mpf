@@ -23,6 +23,7 @@ class Config:
     WORKSHEET_NAME = os.getenv("WORKSHEET_NAME")
 
     FONT = "Arial"
+    JSAR_FONT_SIZE = 10
 
     # Colors
     BRAND_PRIMARY = "#3E552B"
