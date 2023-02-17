@@ -29,19 +29,143 @@ def _fix_left_margin(fig: go.Figure, data: pd.Series, standoff: int = 0) -> None
     fig.update_layout(margin_l=standoff, yaxis_title_standoff=standoff)
 
 
+def _proportional_venn(
+    value1: int, value2: int, overlap: int, label1: str, label2: str
+) -> go.Figure:
+    def diameter_from_area(area: int) -> float:
+        return 2 * (100 * area / np.pi) ** 0.5
+
+    d1 = diameter_from_area(value1)
+    d2 = diameter_from_area(value2)
+
+    x_shift = diameter_from_area(overlap) / 2
+    max_d = max(d1, d2)  # - x_shift
+    total = value1 + value2 - overlap
+
+    circle1 = go.layout.Shape(
+        type="circle",
+        x0=-d1 + x_shift,
+        x1=0 + x_shift,
+        y0=-d1 / 2,
+        y1=d1 / 2,
+        fillcolor=Config.BRAND_PRIMARY,
+        opacity=0.75,
+    )
+    circle2 = go.layout.Shape(
+        type="circle",
+        x0=0 - x_shift,
+        x1=d2 - x_shift,
+        y0=-d2 / 2,
+        y1=d2 / 2,
+        fillcolor=Config.BRAND_SECONDARY,
+        opacity=0.75,
+    )
+    circle1o = go.layout.Shape(
+        type="circle",
+        x0=-d1 + x_shift,
+        x1=0 + x_shift,
+        y0=-d1 / 2,
+        y1=d1 / 2,
+    )
+    circle2o = go.layout.Shape(
+        type="circle",
+        x0=0 - x_shift,
+        x1=d2 - x_shift,
+        y0=-d2 / 2,
+        y1=d2 / 2,
+    )
+
+    annotation1 = go.layout.Annotation(
+        x=-d1 / 2 - x_shift,
+        y=0,
+        text=f"{label1}<br>Only<br>n={value1 - overlap}<br>{(value1 - overlap) * 100 / total:.0f}%",
+        showarrow=False,
+        font=dict(size=16),
+        xanchor="left",
+    )
+    annotation2 = go.layout.Annotation(
+        x=d2 / 2 + x_shift,
+        y=0,
+        text=f"{label2}<br>Only<br>n={value2 - overlap}<br>{(value2 - overlap) * 100 / total:.0f}%",
+        showarrow=False,
+        font=dict(size=16),
+        xanchor="right",
+    )
+    annotation3 = go.layout.Annotation(
+        x=0,
+        y=0,
+        text=f"{label1}<br>&amp;<br>{label2}<br>n={overlap}<br>{overlap * 100 / total:.0f}%",
+        showarrow=False,
+        font=dict(size=16),
+    )
+
+    layout = go.Layout(
+        width=600,
+        height=400,
+        xaxis=dict(
+            scaleanchor="y",
+            scaleratio=1,
+            range=[-max_d, max_d],
+        ),
+        yaxis=dict(
+            scaleanchor="x",
+            scaleratio=1,
+            range=[-max_d / 2, max_d / 2],
+        ),
+        shapes=[circle1, circle2, circle1o, circle2o],
+        annotations=[annotation1, annotation2, annotation3],
+    )
+
+    fig = go.Figure(layout=layout)
+    fig.update_layout(
+        xaxis=dict(
+            showgrid=False,
+            showline=False,
+            zeroline=False,
+            showticklabels=False,
+        ),
+        yaxis=dict(
+            showgrid=False,
+            showline=False,
+            zeroline=False,
+            showticklabels=False,
+        ),
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    return fig
+
+
 ########################################
 # Non Footwear Related
 ########################################
-def events_by_state(df: pd.DataFrame) -> go.Figure:
+def report_types(df: pd.DataFrame) -> go.Figure:
+
+    reported = df["REPORTED"][["Type", "Color", "Brand", "Size"]].count(axis=1).values
+    found = df["FOUND"][["Type", "Color", "Brand", "Size"]].count(axis=1).values
+    both = reported * found
+    both = len(both[np.where(both > 0)])
+    reported = len(reported[np.where(reported > 0)])
+    found = len(found[np.where(found > 0)])
+
+    return _proportional_venn(reported, found, both, "Reported", "Found")
+
+
+def events_by_state(df: pd.DataFrame, percent: bool = False) -> go.Figure:
     """Create chlorpleth map showing data origins."""
     col = Config.STATE
     _df = data.get_value_counts(df, col)
+
+    _df = _df.assign(Percent=_df.Count / _df.Count.sum() * 100)
+    _df = _df.round(1)
+
+    value_col = "Percent" if percent else Config.COUNT
 
     # Create Figure
     fig = px.choropleth(
         _df,
         locations=col,
-        color=Config.COUNT,
+        color=value_col,
         locationmode="USA-states",
         scope="usa",
         height=600,
@@ -53,10 +177,13 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
 
     # Annotate count in each state
     for row in _df.itertuples():
+        text = (
+            f"{getattr(row, value_col)}%" if percent else f"{getattr(row, value_col)}"
+        )
         fig.add_trace(
             go.Scattergeo(
                 locations=[row.State],
-                text=[row.Count],
+                text=text,
                 locationmode="USA-states",
                 mode="text",
                 textfont=dict(
@@ -70,6 +197,11 @@ def events_by_state(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def events_by_state_perc(df: pd.DataFrame) -> go.Figure:
+    """Create chlorpleth map showing data origins."""
+    return events_by_state(df, percent=True)
+
+
 def events_by_category(df: pd.DataFrame) -> go.Figure:
     """Show distribution of cases by LPB category."""
     col = Config.LPB
@@ -79,7 +211,9 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
     adult_df = _df[~_df.LPB.str.startswith("child")]
     total_children = child_df["Count"].sum()
 
-    adult_df.loc[len(adult_df.index)] = ["child", total_children]
+    adult_df = pd.concat(
+        [adult_df, pd.DataFrame([{"LPB": "child", "Count": total_children}])]
+    )
     adult_df = adult_df.sort_values("Count", ascending=False).reset_index(drop=True)
 
     # Create Figure
@@ -664,8 +798,12 @@ def brand_distribution_gte1(
     df: pd.DataFrame,
     threshold: int = 1,
     height: int = 35,
+    horizontal: bool = True,
 ) -> go.Figure:
     _df = data.column_comparison(df, [Config.TYPE, Config.BRAND])
+
+    # TODO remove "skechers + appalacian trail"
+    _df = _df[["+" not in str(value) for value in _df[Config.REPORTED, Config.BRAND]]]
 
     _rdf = _df[Config.REPORTED].dropna().value_counts().reset_index()
     _fdf = _df[Config.FOUND].dropna().value_counts().reset_index()
@@ -686,18 +824,32 @@ def brand_distribution_gte1(
         .index
     )
 
-    fig = px.bar(
-        _df,
-        x=Config.COUNT,
-        y=Config.BRAND,
-        color=Config.TYPE,
-        category_orders={Config.BRAND: brand_order},
-        text_auto=True,
-        height=height * len(brand_order),
-        facet_col=Config.REPORT,
-    )
+    if horizontal:
+        fig = px.bar(
+            _df,
+            x=Config.COUNT,
+            y=Config.BRAND,
+            color=Config.TYPE,
+            category_orders={Config.BRAND: brand_order},
+            text_auto=True,
+            height=height * len(brand_order),
+            facet_col=Config.REPORT,
+        )
+        _fix_left_margin(fig, _df[Config.BRAND])
+    else:
+        fig = px.bar(
+            _df,
+            x=Config.BRAND,
+            y=Config.COUNT,
+            color=Config.TYPE,
+            category_orders={Config.BRAND: brand_order},
+            text_auto=True,
+            height=height,
+            facet_row=Config.REPORT,
+        )
+        if threshold == 1:
+            fig.update_layout(margin_b=100)
 
-    _fix_left_margin(fig, _df[Config.BRAND])
     _fix_facet_labels(fig)
 
     return fig
@@ -705,6 +857,18 @@ def brand_distribution_gte1(
 
 def brand_distribution_gte2(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
     return brand_distribution_gte1(df=df, threshold=threshold, height=50)
+
+
+def brand_distribution_gte1_vertical(df: pd.DataFrame, threshold: int = 1) -> go.Figure:
+    return brand_distribution_gte1(
+        df=df, threshold=threshold, horizontal=False, height=500
+    )
+
+
+def brand_distribution_gte2_vertical(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
+    return brand_distribution_gte1(
+        df=df, threshold=threshold, horizontal=False, height=500
+    )
 
 
 def brand_accuracy(df: pd.DataFrame) -> go.Figure:
@@ -746,6 +910,9 @@ def color_distribution(df: pd.DataFrame) -> go.Figure:
     _df = pd.concat([_rdf, _fdf]).dropna()
     _df.rename(columns={0: Config.COUNT}, inplace=True)
     _df = _df[_df[Config.TYPE] != "mix"]
+
+    _df = _df[["&" not in str(value) for value in _df[Config.COLOR]]]
+    # return _df
 
     brand_order = list(
         _df.groupby(Config.COLOR)
