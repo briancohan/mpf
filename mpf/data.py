@@ -51,20 +51,14 @@ def get_data(creds: dict) -> pd.DataFrame:
 
     except HttpError:
         print("LOADING FROM BACKUP")
-        df = (
-            pd.read_csv(Config.BACKUP_CSV, header=[0, 1])
-            .replace("", np.nan)
-            .fillna(np.nan)
-        )
+        df = pd.read_csv(Config.BACKUP_CSV, header=[0, 1]).replace("", np.nan).fillna(np.nan)
 
     return df
 
 
 def get_value_counts(df: pd.DataFrame, col: str, dropna: bool = True) -> pd.DataFrame:
     _df = (
-        df.iloc[:, df.columns.get_level_values(1) == col]
-        .value_counts(dropna=dropna)
-        .reset_index()
+        df.iloc[:, df.columns.get_level_values(1) == col].value_counts(dropna=dropna).reset_index()
     )
     _df.columns = [col, Config.COUNT]
     return _df
@@ -80,15 +74,13 @@ def column_comparison(df: pd.DataFrame, columns: str | list[str]) -> pd.DataFram
     return _df
 
 
-def column_comparison_no_na(
-    df: pd.DataFrame, col: str, keep_type: bool = True
-) -> pd.DataFrame:
+def column_comparison_no_na(df: pd.DataFrame, col: str, keep_type: bool = True) -> pd.DataFrame:
     _df = column_comparison(df, [Config.TYPE, col]).dropna(
-        subset=[(Config.REPORTED, col), (Config.FOUND, col)]
+        subset=[(Config.REPORTED, col), (Config.FOUND, col)],
     )
 
-    for col in [Config.TYPE, col]:
-        _df[("MATCH", col)] = _df[(Config.REPORTED, col)] == _df[(Config.FOUND, col)]
+    for col_ in [Config.TYPE, col]:
+        _df[("MATCH", col_)] = _df[(Config.REPORTED, col_)] == _df[(Config.FOUND, col_)]
 
     if not keep_type:
         _df = _df.iloc[:, [1, 3, 5]]
@@ -121,20 +113,14 @@ def clean_shoe_size_data(df: pd.DataFrame) -> pd.DataFrame:
         .fillna(np.nan)
     )
 
-    rdf = _df.loc[:, Config.REPORTED].dropna(
-        how="all", subset=[Config.SIZE, Config.SIZE_CAT]
-    )
+    rdf = _df.loc[:, Config.REPORTED].dropna(how="all", subset=[Config.SIZE, Config.SIZE_CAT])
     rdf["Report"] = Config.REPORTED
 
-    fdf = _df.loc[:, Config.FOUND].dropna(
-        how="all", subset=[Config.SIZE, Config.SIZE_CAT]
-    )
+    fdf = _df.loc[:, Config.FOUND].dropna(how="all", subset=[Config.SIZE, Config.SIZE_CAT])
     fdf["Report"] = Config.FOUND
 
     _df = pd.concat([rdf, fdf])
-    _df[Config.SIZE] = [
-        mean([float(i) for i in r.split("-")]) for r in _df[Config.SIZE]
-    ]
+    _df[Config.SIZE] = [mean([float(i) for i in r.split("-")]) for r in _df[Config.SIZE]]
     _df = _df[~_df[Config.TYPE].isna()]
     _df[Config.SIZE_CAT] = _df[Config.SIZE_CAT].fillna("o")
 

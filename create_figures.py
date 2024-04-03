@@ -7,7 +7,7 @@ from mpf.auth import get_credentials
 from mpf.config import Config
 from mpf.data import get_data
 
-# pio.templates.default = "nats+jsar"
+pio.templates.default = "nats+jsar"
 
 df = get_data(get_credentials())
 

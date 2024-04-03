@@ -7,8 +7,10 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import plotly.subplots as sp
 
-from . import theme  # # noqa: F401
-from . import data
+from . import (
+    data,
+    theme,  # # noqa: F401
+)
 from .config import Config
 
 
@@ -30,7 +32,11 @@ def _fix_left_margin(fig: go.Figure, data: pd.Series, standoff: int = 0) -> None
 
 
 def _proportional_venn(
-    value1: int, value2: int, overlap: int, label1: str, label2: str
+    value1: int,
+    value2: int,
+    overlap: int,
+    label1: str,
+    label2: str,
 ) -> go.Figure:
     def diameter_from_area(area: int) -> float:
         return 2 * (100 * area / np.pi) ** 0.5
@@ -80,7 +86,7 @@ def _proportional_venn(
         y=0,
         text=f"{label1}<br>Only<br>n={value1 - overlap}<br>{(value1 - overlap) * 100 / total:.0f}%",
         showarrow=False,
-        font=dict(size=16),
+        font={"size": 16},
         xanchor="left",
     )
     annotation2 = go.layout.Annotation(
@@ -88,7 +94,7 @@ def _proportional_venn(
         y=0,
         text=f"{label2}<br>Only<br>n={value2 - overlap}<br>{(value2 - overlap) * 100 / total:.0f}%",
         showarrow=False,
-        font=dict(size=16),
+        font={"size": 16},
         xanchor="right",
     )
     annotation3 = go.layout.Annotation(
@@ -96,42 +102,42 @@ def _proportional_venn(
         y=0,
         text=f"{label1}<br>&amp;<br>{label2}<br>n={overlap}<br>{overlap * 100 / total:.0f}%",
         showarrow=False,
-        font=dict(size=16),
+        font={"size": 16},
     )
 
     layout = go.Layout(
         width=600,
         height=400,
-        xaxis=dict(
-            scaleanchor="y",
-            scaleratio=1,
-            range=[-max_d, max_d],
-        ),
-        yaxis=dict(
-            scaleanchor="x",
-            scaleratio=1,
-            range=[-max_d / 2, max_d / 2],
-        ),
+        xaxis={
+            "scaleanchor": "y",
+            "scaleratio": 1,
+            "range": [-max_d, max_d],
+        },
+        yaxis={
+            "scaleanchor": "x",
+            "scaleratio": 1,
+            "range": [-max_d / 2, max_d / 2],
+        },
         shapes=[circle1, circle2, circle1o, circle2o],
         annotations=[annotation1, annotation2, annotation3],
     )
 
     fig = go.Figure(layout=layout)
     fig.update_layout(
-        xaxis=dict(
-            showgrid=False,
-            showline=False,
-            zeroline=False,
-            showticklabels=False,
-        ),
-        yaxis=dict(
-            showgrid=False,
-            showline=False,
-            zeroline=False,
-            showticklabels=False,
-        ),
+        xaxis={
+            "showgrid": False,
+            "showline": False,
+            "zeroline": False,
+            "showticklabels": False,
+        },
+        yaxis={
+            "showgrid": False,
+            "showline": False,
+            "zeroline": False,
+            "showticklabels": False,
+        },
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=0, t=0, b=0),
+        margin={"l": 0, "r": 0, "t": 0, "b": 0},
     )
     return fig
 
@@ -140,7 +146,6 @@ def _proportional_venn(
 # Non Footwear Related
 ########################################
 def report_types(df: pd.DataFrame) -> go.Figure:
-
     reported = df["REPORTED"][["Type", "Color", "Brand", "Size"]].count(axis=1).values
     found = df["FOUND"][["Type", "Color", "Brand", "Size"]].count(axis=1).values
     both = reported * found
@@ -177,21 +182,19 @@ def events_by_state(df: pd.DataFrame, percent: bool = False) -> go.Figure:
 
     # Annotate count in each state
     for row in _df.itertuples():
-        text = (
-            f"{getattr(row, value_col)}%" if percent else f"{getattr(row, value_col)}"
-        )
+        text = f"{getattr(row, value_col)}%" if percent else f"{getattr(row, value_col)}"
         fig.add_trace(
             go.Scattergeo(
                 locations=[row.State],
                 text=text,
                 locationmode="USA-states",
                 mode="text",
-                textfont=dict(
-                    color="black" if row.Count < _df.Count.mean() else "white",
-                    size=font_size,
-                ),
+                textfont={
+                    "color": "black" if row.Count < _df.Count.mean() else "white",
+                    "size": font_size,
+                },
                 showlegend=False,
-            )
+            ),
         )
 
     return fig
@@ -211,9 +214,7 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
     adult_df = _df[~_df.LPB.str.startswith("child")]
     total_children = child_df["Count"].sum()
 
-    adult_df = pd.concat(
-        [adult_df, pd.DataFrame([{"LPB": "child", "Count": total_children}])]
-    )
+    adult_df = pd.concat([adult_df, pd.DataFrame([{"LPB": "child", "Count": total_children}])])
     adult_df = adult_df.sort_values("Count", ascending=False).reset_index(drop=True)
 
     # Create Figure
@@ -258,11 +259,7 @@ def events_by_category(df: pd.DataFrame) -> go.Figure:
 def events_by_category_unshod(df: pd.DataFrame) -> go.Figure:
     """Show distribution of cases by LPB category."""
     col = Config.LPB
-    _df = (
-        df[df[(Config.FOUND, Config.TYPE)] == "unshod"][("", col)]
-        .value_counts()
-        .reset_index()
-    )
+    _df = df[df[(Config.FOUND, Config.TYPE)] == "unshod"][("", col)].value_counts().reset_index()
 
     _df.columns = [col, Config.COUNT]
 
@@ -309,7 +306,7 @@ def data_completeness(df: pd.DataFrame) -> go.Figure:
             [
                 ~_df[(Config.REPORTED, metric)].isna(),
                 ~_df[(Config.FOUND, metric)].isna(),
-            ]
+            ],
         )
         _df[("BOTH", metric)] = counts == 2
         _df = _df.replace(True, "included").replace(False, np.nan)
@@ -412,8 +409,7 @@ def overall_accuracy(df: pd.DataFrame, size_tolerance: float = 0.5) -> go.Figure
     color_df = data.column_comparison_no_na(df, Config.COLOR, keep_type=False)
 
     color_df["MATCH"] = [
-        row.REPORTED in row.FOUND or row.FOUND in row.REPORTED
-        for row in color_df.itertuples()
+        row.REPORTED in row.FOUND or row.FOUND in row.REPORTED for row in color_df.itertuples()
     ]
 
     # Brand Info
@@ -463,22 +459,16 @@ def overall_accuracy(df: pd.DataFrame, size_tolerance: float = 0.5) -> go.Figure
     )
     _df = _df.sort_values("Correct")
 
-    opts = dict(
-        x="value",
-        y="Metric",
-        color="variable",
-        orientation="h",
-        text_auto=True,
-        category_orders={
-            "Metric": [Config.TYPE, Config.COLOR, Config.BRAND, Config.SIZE]
-        },
-    )
-    fig_v = px.bar(
-        _df[["Metric", "Correct", "Incorrect"]].melt(id_vars="Metric"), **opts
-    )
-    fig_p = px.bar(
-        _df[["Metric", "% Correct", "% Incorrect"]].melt(id_vars="Metric"), **opts
-    )
+    opts = {
+        "x": "value",
+        "y": "Metric",
+        "color": "variable",
+        "orientation": "h",
+        "text_auto": True,
+        "category_orders": {"Metric": [Config.TYPE, Config.COLOR, Config.BRAND, Config.SIZE]},
+    }
+    fig_v = px.bar(_df[["Metric", "Correct", "Incorrect"]].melt(id_vars="Metric"), **opts)
+    fig_p = px.bar(_df[["Metric", "% Correct", "% Incorrect"]].melt(id_vars="Metric"), **opts)
 
     fig = sp.make_subplots(rows=1, cols=2, column_titles=["By Value", "By Percentage"])
     for item in fig_v.data:
@@ -541,8 +531,7 @@ def _fix_size_yaxis_labels(fig: go.Figure) -> None:
         annotation
         for annotation in fig.layout.annotations
         if not any(
-            word.lower() in annotation.text.lower()
-            for word in [Config.REPORTED, Config.FOUND]
+            word.lower() in annotation.text.lower() for word in [Config.REPORTED, Config.FOUND]
         )
     ]
     fig.layout.annotations = annotations
@@ -581,7 +570,7 @@ def shoe_size_distribution_by_type(df: pd.DataFrame) -> go.Figure:
     for annotation in fig.layout.annotations:
         annotation.text = annotation.text.split("=")[1].capitalize()
 
-    legend_names = dict(m="Mens", w="Womens", y="Youth", o="Unknown")
+    legend_names = {"m": "Mens", "w": "Womens", "y": "Youth", "o": "Unknown"}
     for record in fig.data:
         for attr in ["legendgroup", "name", "offsetgroup"]:
             record[attr] = legend_names[record[attr]]
@@ -618,7 +607,7 @@ def shoe_size_distribution_by_category(df: pd.DataFrame) -> go.Figure:
     )
 
     _fix_facet_labels(fig)
-    legend_names = dict(m="Mens", w="Womens", y="Youth", o="Unknown")
+    legend_names = {"m": "Mens", "w": "Womens", "y": "Youth", "o": "Unknown"}
     for annotation in fig.layout.annotations:
         if annotation.text in legend_names.keys():
             annotation.text = legend_names[annotation.text]
@@ -631,14 +620,12 @@ def shoe_size_distribution_by_category(df: pd.DataFrame) -> go.Figure:
 
 def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
     _df = data.column_comparison(df, [Config.TYPE, Config.SIZE]).dropna(
-        subset=[(Config.REPORTED, Config.SIZE), (Config.FOUND, Config.SIZE)]
+        subset=[(Config.REPORTED, Config.SIZE), (Config.FOUND, Config.SIZE)],
     )
     _df.columns = ["report_type", "report_size", "found_type", "found_size"]
 
     # Convert to ranges and determine min/max size
-    _df["report_size"] = [
-        tuple(float(i) for i in value.split("-")) for value in _df["report_size"]
-    ]
+    _df["report_size"] = [tuple(float(i) for i in value.split("-")) for value in _df["report_size"]]
     sizes = list(chain.from_iterable(_df["report_size"])) + list(_df["found_size"])
     sizes = [float(size) for size in sizes]
     rng = [min(sizes) - 1, max(sizes) + 1]
@@ -653,7 +640,7 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
                 showlegend=False,
                 marker_color=Config.FOOTWEAR_COLOR[row.found_type],
                 marker_symbol=Config.FOOTWEAR_MARKER[row.found_type],
-            )
+            ),
         )
 
     # Legend
@@ -667,7 +654,7 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
             showlegend=False,
             marker_color=Config.BRAND_PRIMARY,
             line_color=Config.BRAND_PRIMARY,
-        )
+        ),
     )
     fig.add_annotation(
         text="Reported Range",
@@ -706,11 +693,9 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
                 showlegend=False,
                 marker_color=marker_color,
                 marker_symbol=marker_symbol,
-            )
+            ),
         )
-        fig.add_annotation(
-            text=text, x=legend_text_start, y=y, showarrow=False, xanchor="left"
-        )
+        fig.add_annotation(text=text, x=legend_text_start, y=y, showarrow=False, xanchor="left")
         if "Found" not in text:
             y -= legend_spacing
         y -= legend_spacing
@@ -721,7 +706,7 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
     erng = rng[0] - 1, rng[1] + 1
     fig.add_shape(
         type="line",
-        line=dict(color="black", dash="dot"),
+        line={"color": "black", "dash": "dot"},
         xref="x",
         x0=erng[0],
         x1=erng[1],
@@ -740,12 +725,12 @@ def shoe_size_accuracy(df: pd.DataFrame) -> go.Figure:
                 ],
                 y=[erng[0], erng[1], erng[1], erng[0]],
                 fill="toself",
-                line=dict(width=0),
+                line={"width": 0},
                 marker=None,
                 showlegend=False,
                 fillcolor="#788d64",
                 opacity=0.25,
-            )
+            ),
         )
 
     # Error Range Annotations
@@ -860,15 +845,11 @@ def brand_distribution_gte2(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
 
 
 def brand_distribution_gte1_vertical(df: pd.DataFrame, threshold: int = 1) -> go.Figure:
-    return brand_distribution_gte1(
-        df=df, threshold=threshold, horizontal=False, height=500
-    )
+    return brand_distribution_gte1(df=df, threshold=threshold, horizontal=False, height=500)
 
 
 def brand_distribution_gte2_vertical(df: pd.DataFrame, threshold: int = 2) -> go.Figure:
-    return brand_distribution_gte1(
-        df=df, threshold=threshold, horizontal=False, height=500
-    )
+    return brand_distribution_gte1(df=df, threshold=threshold, horizontal=False, height=500)
 
 
 def brand_accuracy(df: pd.DataFrame) -> go.Figure:
@@ -880,10 +861,10 @@ def brand_accuracy(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure(
         data=[
             go.Table(
-                header=dict(values=_df.columns),
-                cells=dict(values=_df.T.values),
-            )
-        ]
+                header={"values": _df.columns},
+                cells={"values": _df.T.values},
+            ),
+        ],
     )
     return fig
 
@@ -894,9 +875,7 @@ def brand_accuracy(df: pd.DataFrame) -> go.Figure:
 def color_distribution(df: pd.DataFrame) -> go.Figure:
     _df = data.column_comparison(df, [Config.TYPE, Config.COLOR])
     for report_type in (Config.REPORTED, Config.FOUND):
-        _df.loc[
-            _df[(report_type, Config.TYPE)] == "minimal", (report_type, Config.TYPE)
-        ] = "shoes"
+        _df.loc[_df[(report_type, Config.TYPE)] == "minimal", (report_type, Config.TYPE)] = "shoes"
         for sep in "/,":
             _df[(report_type, Config.COLOR)] = [
                 color.split(sep)[0] if sep in str(color) else color
@@ -918,7 +897,7 @@ def color_distribution(df: pd.DataFrame) -> go.Figure:
         _df.groupby(Config.COLOR)
         .sum(numeric_only=True)
         .sort_values(Config.COUNT, ascending=False)
-        .index
+        .index,
     )
     brand_order.remove("various")
     brand_order.append("various")
@@ -945,15 +924,14 @@ def color_accuracy(df: pd.DataFrame) -> go.Figure:
 
     _df = _df[_df["MATCH"].sum(axis=1) < 2]
     _df.columns = [" - ".join(col) for col in _df.columns]
-    _df
 
     fig = go.Figure(
         data=[
             go.Table(
-                header=dict(values=_df.columns),
-                cells=dict(values=_df.T.values),
-            )
-        ]
+                header={"values": _df.columns},
+                cells={"values": _df.T.values},
+            ),
+        ],
     )
     fig.update_layout(height=800)
     return fig

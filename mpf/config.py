@@ -29,20 +29,20 @@ class Config:
     BRAND_PRIMARY = "#3E552B"
     BRAND_SECONDARY = "#EDDEBF"
 
-    FOOTWEAR_COLOR = dict(
-        boots="#82B756",
-        unshod="#826868",
-        minimal="#C3AC77",
-        shoes="#6475B3",
-        mix="#BF6E85",
-    )
-    FOOTWEAR_MARKER = dict(
-        boots="circle",
-        shoes="square",
-        unshod="circle-open-dot",
-        minimal="diamond-wide",
-        mix="cross",
-    )
+    FOOTWEAR_COLOR = {
+        "boots": "#82B756",
+        "unshod": "#826868",
+        "minimal": "#C3AC77",
+        "shoes": "#6475B3",
+        "mix": "#BF6E85",
+    }
+    FOOTWEAR_MARKER = {
+        "boots": "circle",
+        "shoes": "square",
+        "unshod": "circle-open-dot",
+        "minimal": "diamond-wide",
+        "mix": "cross",
+    }
 
     # Keywords
     REPORTED = "REPORTED"
