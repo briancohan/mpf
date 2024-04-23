@@ -13,12 +13,15 @@ google-auth-oauthlib = "^1.2.0"
 pandas = "^2.2.1"
 plotly = "^5.20.0"
 python-dotenv = "^1.0.1"
+kaleido = "0.2"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
 ipykernel = "^6.29.4"
 nbformat = "^5.10.3"
 mypy = "^1.9.0"
+pytest = "^8.1.1"
+pytest-datadir = "^1.5.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -56,6 +59,9 @@ ignore = [
     "D301", # Use r if any backslashes in a docstring
     "E203", # Whitespace before ':'
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
 
 [tool.mypy]
 ignore_missing_imports = true

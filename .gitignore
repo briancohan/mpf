@@ -1,7 +1,8 @@
-.env
-.cred/
-*.ipynb
 __pycache__
-figures/
+.cred/
+.env
+.ruff_cache/
 *.csv
+*.ipynb
+figures/
 Pipfile
